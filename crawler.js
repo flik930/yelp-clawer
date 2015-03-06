@@ -18,11 +18,11 @@ if (typeof String.prototype.startsWith != 'function') {
 
 var request = require('request');
 var cheerio = require('cheerio');
-function getPage(){
+function getPage(start,proxy){
     
-    var proxy = request.defaults({proxy: "http://173.208.248.221:7808"});
+    var proxy = request.defaults({proxy: "http://"+proxy});
 
-    var req = proxy.get({uri: 'http://www.yelp.com/search?find_loc=CA', encoding: 'utf8'});
+    var req = proxy.get({uri: 'http://www.yelp.com/search?find_loc=CA&start='+start, encoding: 'utf8'});
     var str;
     req.on('data', function(chunk){
         str+=chunk;
@@ -30,12 +30,14 @@ function getPage(){
     req.on('end', function() {
         $ = cheerio.load(str);
         if($("#content h2").html() === "Sorry, you&apos;re not allowed to access this page."){
-            console.log("fail proxy");
+            return false;
+        }else{
+            return true;
         }
     });
 }
 
-function getProxyList(){
+function getProxyList(callback){
     req = request.get({uri: 'http://www.us-proxy.org/', encoding: 'utf8'});
     var str;
     req.on('data', function(chunk){
@@ -56,12 +58,61 @@ function getProxyList(){
                 
             }
         });
-        getPage();
-//        connection.end();
+        callback();
     });
 }
 
-getProxyList();
+function getNumberOfPage(location, callback){
+    console.log("getNumberOfPage");
+    var req = request.get({uri: 'http://www.yelp.com/search?find_loc='+location, encoding: 'utf8'});
+    var str;
+    req.on('data', function(chunk){
+        str+=chunk;
+    });
+    req.on('end', function() {
+        $ = cheerio.load(str);
+        var pageStr = $(".pagination-results-window").html();
+        var str_arr = pageStr.split(" of ");
+        callback(str_arr[1]);
+    });
+}
+
+function chooseProxyList(i, callback){
+    connection.query('select * from proxylist where status = "normal" order by rand()', function(err, rows, fields) {
+        if (err) throw err;
+        callback(i, rows[0].ip);
+        
+    });
+}
+
+function main(location){
+    getProxyList(function(){
+        getNumberOfPage(location,function(totalpage){
+            for(var i = 0; i<totalpage; i+=10){
+                var succeed = false;
+                while(!succeed){
+                    chooseProxyList(i, function(i,proxy){
+                        var result = getPage(i,proxy,function(){
+                            if(!result){
+                                connection.query('update proxylist set status = "banned" where ip = "'+proxy+'"', function(err, rows, fields) {
+                                    if (err) throw err;
+                                });
+                            }
+                        });
+                        
+                    });
+                    
+                }
+                console.log("Job: "+location+", Page: "+i+", Success");
+            }
+        });
+    });
+}
+
+var location = "CA";
+main(location);
+//getNumberOfPage("CA");
+//getProxyList();
 //getPage();
 
 
