@@ -1,4 +1,13 @@
 var http = require('http');
+var mysql = require('mysql');
+var connection = mysql.createConnection({
+  host     : '54.254.209.30',
+  user     : 'crawler',
+  password : 'yelpcrawler123',
+  database : 'crawler'
+});
+
+connection.connect();
 
 if (typeof String.prototype.startsWith != 'function') {
   // see below for better implementation!
@@ -36,13 +45,19 @@ function getProxyList(){
         $ = cheerio.load(str);
         $("#proxylisttable tr").each(function(key,val){
             if($(val).html().startsWith("<td>")){
-                var row = $(val).html()
+                var row = $(val).html();
                 var ip = $(row).first().html();
-                var port = $(row).first().next().html()
+                var port = $(row).first().next().html();
+                
                 console.log(ip+":"+port);
+                connection.query('insert into proxylist (ip, status) values ("'+ip+":"+port+'","normal") on duplicate key update status = status', function(err, rows, fields) {
+                    if (err) throw err;
+                });
+                
             }
-        })
-//        console.log($("#proxylisttable tr"));
+        });
+        getPage();
+//        connection.end();
     });
 }
 
@@ -50,45 +65,3 @@ getProxyList();
 //getPage();
 
 
-//callback = function(response) {
-//  var str = '';
-//
-//  //another chunk of data has been recieved, so append it to `str`
-//  response.on('data', function (chunk) {
-//    str += chunk;
-//  });
-//
-//  //the whole response has been recieved, so we just print it out here
-//  response.on('end', function () {
-//      var cheerio = require('cheerio'),
-//    $ = cheerio.load(str);
-//    console.log(str);
-////    var res = $('address');
-//////    console.log(res);
-////    for(var key in res){
-////        console.log(res[key]['children']);
-////    }
-//  });
-//}
-
-
-
-//callback = function(response) {
-//  var str = '';
-//
-//  //another chunk of data has been recieved, so append it to `str`
-//  response.on('data', function (chunk) {
-//    str += chunk;
-//  });
-//
-//  //the whole response has been recieved, so we just print it out here
-//  response.on('end', function () {
-//      var cheerio = require('cheerio'),
-//    $ = cheerio.load(str);
-//    console.log(str);
-////    var res = $('address');
-//////    console.log(res);
-////    for(var key in res){
-////        console.log(
-
-//http.request(options, callback).end();
